@@ -65,6 +65,10 @@ Provide:
                     response_schema=PRSummary,
                 ),
             )
+            if response.parsed is None:
+                # The reply was blocked or cut off, so there was no complete
+                # JSON to validate against the schema.
+                raise SystemExit("Gemini returned no usable summary. Try again, or pass a smaller diff.")
             return response.parsed
         except genai_errors.ServerError as e:
             # Gemini's servers occasionally return a temporary 503 under
@@ -72,8 +76,9 @@ Provide:
             # and retry a few times before giving up.
             if attempt == MAX_RETRIES:
                 raise
+            # stderr, so the notice stays out of a summary piped to a file.
             print(f"  (model temporarily unavailable, retrying in {RETRY_DELAY_SECONDS}s... "
-                  f"attempt {attempt}/{MAX_RETRIES})")
+                  f"attempt {attempt}/{MAX_RETRIES})", file=sys.stderr)
             time.sleep(RETRY_DELAY_SECONDS)
 
 
