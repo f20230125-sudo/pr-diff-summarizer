@@ -1,0 +1,38 @@
+diff --git a/app/auth/login.py b/app/auth/login.py
+index 3a1c2e4..9f2b8d1 100644
+--- a/app/auth/login.py
++++ b/app/auth/login.py
+@@ -12,10 +12,18 @@ def login(request):
+     email = request.form.get("email")
+     password = request.form.get("password")
+
+-    user = User.query.filter_by(email=email).first()
+-    if user and user.password == password:
+-        session["user_id"] = user.id
+-        return redirect("/dashboard")
+-    return render_template("login.html", error="Invalid credentials")
++    if not email or not password:
++        return render_template("login.html", error="Email and password are required")
++
++    user = User.query.filter_by(email=email).first()
++    if user and check_password_hash(user.password_hash, password):
++        session["user_id"] = user.id
++        session["login_attempts"] = 0
++        return redirect("/dashboard")
++
++    attempts = session.get("login_attempts", 0) + 1
++    session["login_attempts"] = attempts
++    if attempts >= 5:
++        return render_template("login.html", error="Too many failed attempts. Try again later.")
++    return render_template("login.html", error="Invalid credentials")
+
+diff --git a/app/models/user.py b/app/models/user.py
+index 7d3e1a2..b8c4f90 100644
+--- a/app/models/user.py
++++ b/app/models/user.py
+@@ -5,7 +5,7 @@ class User(db.Model):
+     id = db.Column(db.Integer, primary_key=True)
+     email = db.Column(db.String(120), unique=True, nullable=False)
+-    password = db.Column(db.String(120), nullable=False)
++    password_hash = db.Column(db.String(255), nullable=False)
+     created_at = db.Column(db.DateTime, default=datetime.utcnow)
