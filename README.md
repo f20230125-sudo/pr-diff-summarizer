@@ -39,6 +39,17 @@ Or try it on the bundled example diff (a login-hardening change):
 python summarize_pr.py sample_diff.txt
 ```
 
+## Tests
+
+```bash
+pip install pytest
+pytest
+```
+
+The tests swap Gemini for a stub client, so they run without an API key
+and make no network calls. They cover the request sent to the model, the
+retry on a temporary 503, and reading the diff from a file or stdin.
+
 ## Stack
 
 Python, Google Gemini API (`google-genai`), Pydantic (schema-validated
