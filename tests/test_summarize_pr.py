@@ -33,8 +33,9 @@ SAMPLE = PRSummary(
 class StubClient:
     """Stands in for genai.Client: raises each queued error, then answers."""
 
-    def __init__(self, errors=()):
+    def __init__(self, errors=(), parsed=SAMPLE):
         self.errors = list(errors)
+        self.parsed = parsed
         self.calls = []
         self.models = SimpleNamespace(generate_content=self._generate_content)
 
@@ -42,7 +43,7 @@ class StubClient:
         self.calls.append(kwargs)
         if self.errors:
             raise self.errors.pop(0)
-        return SimpleNamespace(parsed=SAMPLE)
+        return SimpleNamespace(parsed=self.parsed)
 
 
 def server_error():
@@ -91,6 +92,26 @@ def test_retries_when_the_model_is_temporarily_unavailable(sleeps):
     assert summarize_diff(client, DIFF) == SAMPLE
     assert len(client.calls) == 3
     assert sleeps == [summarize_pr.RETRY_DELAY_SECONDS] * 2
+
+
+def test_retry_notice_goes_to_stderr_not_stdout(sleeps, capsys):
+    client = StubClient(errors=[server_error()])
+
+    summarize_diff(client, DIFF)
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "retrying" in captured.err
+
+
+def test_exits_clearly_when_the_reply_has_no_parsed_summary(sleeps):
+    client = StubClient(parsed=None)
+
+    with pytest.raises(SystemExit, match="no usable summary"):
+        summarize_diff(client, DIFF)
+
+    assert len(client.calls) == 1
+    assert sleeps == []
 
 
 def test_gives_up_after_the_last_retry(sleeps):
